@@ -1,0 +1,106 @@
+<div class="row">
+
+  <div class="col-6">
+    <ngb-tabset [justify]="'justified'">
+      <ngb-tab title="Add">
+        <ng-template ngbTabContent>
+          <br>
+          <form class="">
+            <div class="form-group">
+              <input [(ngModel)]="newNode.label" type="text" name="new-node-name" class="form-control" id="node-name-add" aria-describedby="node-name"
+                     maxlength="100" autocomplete="off" placeholder="Name">
+            </div>
+            <div class="form-group">
+              <div ngbDropdown class="d-inline-block">
+                <button type="button" class="btn btn-outline-primary" ngbDropdownToggle>
+                  {{(selectedParentNode.label.length > 50
+                        ? (selectedParentNode.label | slice:0:25) + ' ... ' + (selectedParentNode.label | slice:(selectedParentNode.label.length - 25): selectedParentNode.label.length)
+                        : selectedParentNode.label) || 'Parent'}}
+                </button>
+                <div ngbDropdownMenu *ngIf="selectableNodes.length" class="dropdown-resized">
+                  <button *ngIf="selectedParentNode.id" (click)="deselectParentNode()" type="button" class="dropdown-item cursor-pointer">Clear</button>
+                  <div *ngIf="selectedParentNode.id" class="dropdown-divider"></div>
+                  <button *ngFor="let node of selectableNodes" (click)="selectParentNode(node)" type="button" class="dropdown-item cursor-pointer" >
+                    {{node.label.length > 50
+                          ? (node.label | slice:0:25) + ' ... ' + (node.label | slice:(node.label.length - 25): node.label.length)
+                          : node.label}}
+                  </button>
+                </div>
+              </div>
+            </div>
+            <div class="form-group">
+              <textarea [(ngModel)]="newNode.description" class="form-control" id="node-description-add" rows="3" name="new-node-description" placeholder="Description"></textarea>
+            </div>
+
+            <button type="button" class="btn btn-primary" (click)="addNode()" [disabled]="!newNode.label || !newNode.description">Add</button>
+          </form>
+        </ng-template>
+      </ngb-tab>
+
+      <ngb-tab title="Edit" [disabled]="!nodesData.length || !editNode.id">
+        <ng-template ngbTabContent>
+          <br>
+          <form>
+            <div class="form-group">
+              <input [(ngModel)]="editNode.label" type="text" name="new-node-name" class="form-control" id="node-name-edit" aria-describedby="node-name"
+                     maxlength="100" autocomplete="off" placeholder="Name">
+            </div>
+            <div class="form-group">
+              Add new parent:
+              <div ngbDropdown class="d-inline-block">
+                <button type="button" class="btn btn-outline-primary" ngbDropdownToggle>
+                  {{(editNodeNewParent.label.length > 50
+                        ? (editNodeNewParent.label | slice:0:25) + ' ... ' + (editNodeNewParent.label | slice:(editNodeNewParent.label.length - 25): editNodeNewParent.label.length)
+                        : editNodeNewParent.label) || 'Parent'}}
+                </button>
+                <div ngbDropdownMenu *ngIf="selectableNodes.length" class="dropdown-resized">
+                  <button *ngFor="let node of selectableNodes" (click)="selectEditNodeNewParent(node)" type="button"
+                          class="dropdown-item cursor-pointer" [disabled]="isAddNewParentDisabled(node)">
+                    {{node.label.length > 50
+                          ? (node.label | slice:0:25) + ' ... ' + (node.label | slice:(node.label.length - 25): node.label.length)
+                          : node.label}}
+                  </button>
+                </div>
+              </div>
+            </div>
+            <div class="form-group">
+              Remove parent:
+              <div ngbDropdown class="d-inline-block">
+                <button type="button" class="btn btn-outline-primary" ngbDropdownToggle>
+                  {{(editNodeParentToRemove.label.length > 50
+                        ? (editNodeParentToRemove.label | slice:0:25) + ' ... ' + (editNodeParentToRemove.label | slice:(editNodeParentToRemove.label.length - 25): editNodeNewParent.label.length)
+                        : editNodeParentToRemove.label) || 'Parent'}}
+                </button>
+                <div ngbDropdownMenu *ngIf="selectableNodesToRemove.length" class="dropdown-resized">
+                  <button *ngFor="let node of selectableNodesToRemove" (click)="selectEditNodeParentToRemove(node)" type="button"
+                          class="dropdown-item cursor-pointer">
+                    {{node.label.length > 50
+                          ? (node.label | slice:0:25) + ' ... ' + (node.label | slice:(node.label.length - 25): node.label.length)
+                          : node.label}}
+                  </button>
+                </div>
+              </div>
+            </div>
+            <div class="form-group">
+              <textarea [(ngModel)]="editNode.description" class="form-control" id="node-description-edit" rows="3" name="new-node-description" placeholder="Description"></textarea>
+            </div>
+
+            <button type="button" class="btn btn-primary" (click)="editNode_()"
+                    [disabled]="!editNode.label || !editNode.description">Save</button>
+            <button type="button" class="btn btn-danger float-right" (click)="deleteNode()">Delete</button>
+          </form>
+        </ng-template>
+      </ngb-tab>
+
+    </ngb-tabset>
+  </div>
+
+  <div class="col-6">
+    <div id="visualization"></div>
+  </div>
+
+</div>
+
+
+
+
