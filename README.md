@@ -1,4 +1,4 @@
-## Stack:
+## MindTree
 
 MongoDB 4.0.5
 
@@ -9,9 +9,9 @@ Angular 7
 Node.js 10.13.0
 
 
-## Usage
+## Usage and installation
 
-First you'll need to create `issues` database and `issues` collection in MongoDB.
+First you'll need to create `mindtree` database. After that create `nodes` and `edges` collection in MongoDB.
 
 #### Development 
 
@@ -39,6 +39,7 @@ This will start the node server, connect to MongoDB and watch for changes.
 In the `frontend` folder run the following commands:
 
 ```
+npm install
 npm run build-prod
 ```
 
@@ -48,6 +49,7 @@ This will install node modules and will create `dist` folder which will be ready
 In the `backend` folder run the following commands:
 
 ```
+npm install
 npm start
 ```
 

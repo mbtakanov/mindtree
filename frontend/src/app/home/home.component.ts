@@ -24,7 +24,8 @@ export class HomeComponent implements OnInit {
   newNode: Node;
   newEdge: Edge;
   selectableNodes: Node[];
-  selectableNodesToRemove: Node[];
+  eligibleNodesToRemove: Node[];
+  eligibleNodesToAddAsNewParent: Node[];
   selectedParentNode: Node;
   editNode: Node;
   editNodeNewParent: Node;
@@ -36,7 +37,8 @@ export class HomeComponent implements OnInit {
     this.nodesData = [];
     this.edgesData = [];
     this.selectableNodes = [];
-    this.selectableNodesToRemove = [];
+    this.eligibleNodesToRemove = [];
+    this.eligibleNodesToAddAsNewParent = [];
 
     this.nodes = new DataSet(this.nodesData);
     this.edges = new DataSet(this.edgesData);
@@ -58,14 +60,12 @@ export class HomeComponent implements OnInit {
     const container = document.getElementById('visualization');
     const options = {
       layout: {
+        // TODO: See if the save works for x and y
         // hierarchical: {
-          // nodeSpacing: 300,
-          // direction: 'UD',
-          // sortMethod: 'directed'
+        //   nodeSpacing: 300,
+        //   direction: 'UD',
+        //   sortMethod: 'directed',
         // }
-      },
-      interaction: {
-        dragNodes: true
       },
       nodes: {
         size: 10,
@@ -86,7 +86,13 @@ export class HomeComponent implements OnInit {
           color: 'white',
         }
       },
-      physics: false,
+      // edges: { },
+      physics: {
+        stabilization: true
+      },
+      interaction: {
+        dragNodes: true
+      },
       manipulation: { }
     };
     this.nodes = new DataSet(this.nodesData);
@@ -104,6 +110,23 @@ export class HomeComponent implements OnInit {
       const nodeIndex = this.getNodeAt(params.pointer.DOM);
       that.nodeRightClick(nodeIndex);
     });
+
+    // After stabilization, the network will remove the hierarchical option
+    // this.network.on('stabilized', () => {
+    //   this.network.stopSimulation();
+    //   this.network.setOptions({
+    //     'layout': {'hierarchical': {'enabled': false}}
+    //   });
+    // });
+    //
+    // let hasDrawnOnce = false;
+    // this.network.on('startStabilizing', () => {
+    //   if (hasDrawnOnce !== false) {
+    //     this.network.stopSimulation();
+    //   }
+    //
+    //   hasDrawnOnce = true;
+    // });
   }
 
   getNodes() {
@@ -122,7 +145,7 @@ export class HomeComponent implements OnInit {
   addNode() {
     if (this.newEdge.from) {
       // Creating child node
-      this.dataService.addChild(this.newNode, this.newEdge).subscribe((response: NodeResponse) => {
+      this.dataService.addNodeWithEdge(this.newNode, this.newEdge).subscribe((response: NodeResponse) => {
         this.addVisNodeAfterResponse(response);
         this.addVisEdgeAfterResponse(response);
         this.getSelectableNodes();
@@ -131,7 +154,7 @@ export class HomeComponent implements OnInit {
       });
     } else {
       // Creating parent node
-      this.dataService.addParent(this.newNode).subscribe((response: NodeResponse) => {
+      this.dataService.addNodeWithoutEdge(this.newNode).subscribe((response: NodeResponse) => {
         this.addVisNodeAfterResponse(response);
         this.getSelectableNodes();
         this.selectedParentNode = new Node();
@@ -143,34 +166,54 @@ export class HomeComponent implements OnInit {
   editNode_() {
     // TODO: Change the logic when adding a parent node to a child node. New edge is created and some edges are deleted.
     // this.editEdge = new Edge(this.editNode.id);
-    this.dataService.editNode(this.editNode, this.editNodeNewParent.id, this.editNodeParentToRemove.id).subscribe(response => {
+    this.dataService.editNode(this.editNode, this.editNodeNewParent.id, this.editNodeParentToRemove.id).subscribe((response: any) => {
+      this.nodesData = this.nodesData.map(node => {
+        if (node.id === this.editNode.id) {
+          node.label = this.editNode.label;
+          node.description = this.editNode.description;
+        }
 
-      // this.nodesData = this.nodesData.map(node => {
-      //   if (node.id === this.editNode.id) {
-      //     node.label = this.editNode.label;
-      //     node.description = this.editNode.description;
-      //   }
-      //
-      //   return node;
-      // });
-      //
-      // this.edgesData = this.edgesData.map(edge => {
-      //   if (edge.id === this.editEdge.id) {
-      //     edge.from = this.editEdge.from;
-      //     edge.to = this.editEdge.to;
-      //   }
-      //
-      //   return edge;
-      // });
+        return node;
+      });
+
+      if (this.editNodeNewParent.id && response.edge) {
+        this.edgesData.push(response.edge);
+      }
+
+      if (this.editNodeParentToRemove.id) {
+        let index = -1;
+        this.edgesData.forEach((e, i) => {
+          if ((e.from === this.editNodeParentToRemove.id && e.to === this.editNode.id) ||
+            (e.from === this.editNode.id && e.to === this.editNodeParentToRemove.id)) {
+            index = i;
+          }
+        });
+
+        if (index > -1) {
+          this.edgesData.splice(index, 1);
+        }
+      }
 
       // TODO: This should be replaced with an update method. The built-in update method doesn't work properly.
       this.initNetwork();
+
+      this.editNodeNewParent = new Node();
+      this.editNodeParentToRemove = new Node();
+      this.getEligibleNodesToRemove();
+      this.getEligibleNodesToAddAsNewParent();
     });
   }
 
   deleteNode() {
     this.dataService.deleteNode(this.editNode).subscribe(response => {
       console.log(response);
+    });
+  }
+
+  savePositions() {
+    const allNodes = this.nodes.get({returnType: 'Object'});
+    this.dataService.savePositions(allNodes).subscribe(response => {
+      console.log(1);
     });
   }
 
@@ -206,11 +249,41 @@ export class HomeComponent implements OnInit {
     this.newEdge = new Edge();
   }
 
-  isAddNewParentDisabled(node) {
-    // TODO: finish this function
-    // node.id === editNode.id || node.id === editEdge.from
-    return false;
+  getEligibleNodesToRemove() {
+    this.eligibleNodesToRemove = [];
+    this.edgesData.forEach(edge => {
+      if (edge.to === this.editNode.id || edge.from === this.editNode.id) {
+        // this.editEdge = edge; // In order to disable some nodes when selecting new parent
+
+        this.nodesData.forEach(n => {
+          if (n.id !== this.editNode.id && (n.id === edge.from || n.id === edge.to)) {
+            this.eligibleNodesToRemove.push(n);
+          }
+        });
+      }
+    });
   }
+
+  getEligibleNodesToAddAsNewParent() {
+    this.eligibleNodesToAddAsNewParent = this.selectableNodes.filter(n => {
+      let result = true;
+
+      if (n.id === this.editNode.id) {
+        result = false;
+      }
+
+      this.edges.forEach(edge => {
+        if (this.editNode.id === edge.from || this.editNode.id === edge.to) {
+          if (n.id === edge.from || n.id === edge.to) {
+            result = false;
+          }
+        }
+      });
+
+      return result;
+    });
+  }
+
   nodeLeftClick(params) {
     if (params.nodes.length > 0) {
       const nodeIndex = params.nodes[0];
@@ -219,23 +292,9 @@ export class HomeComponent implements OnInit {
       this.selectParentNode(node);
 
       this.editNode = node;
-      this.edgesData.forEach(edge => {
-        if (edge.to === this.editNode.id) {
-          this.editEdge = edge; // In order to disable some nodes when selecting new parent
+      this.getEligibleNodesToRemove();
+      this.getEligibleNodesToAddAsNewParent();
 
-          this.nodesData.forEach(n => {
-            if (n.id === edge.from) {
-              this.selectableNodesToRemove.push(n);
-            }
-          });
-        }
-      });
-
-      // this.nodesData.forEach(n => {
-      //   if (n.id === node.id) {
-      //     this.editNodeNewParent = n;
-      //   }
-      // });
     }
   }
 

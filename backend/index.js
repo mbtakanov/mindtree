@@ -49,6 +49,7 @@ router.route('/nodes').get((req, res) => {
 });
 
 router.route('/nodes/add/parent').post((req, res) => {
+   // Add node without edge
    let newNode = new Node(req.body);
    newNode.id = new mongoose.Types.ObjectId();
    newNode.save().then(node => {
@@ -59,6 +60,7 @@ router.route('/nodes/add/parent').post((req, res) => {
 });
 
 router.route('/nodes/add/child').post((req, res) => {
+   // Add node with edge to some other node
    let newNode = new Node(req.body.node);
    newNode.id = new mongoose.Types.ObjectId();
    newNode.save().then(node => {
@@ -84,33 +86,45 @@ router.route('/nodes/update').put((req, res) => {
       } else {
          node.label = req.body.node.label;
          node.description = req.body.node.description;
+         node.x = req.body.node.x;
+         node.y = req.body.node.y;
 
          node.save().then(node => {
+            let queue = [];
             if (req.body.nodeNewParentId) {
                let edge = new Edge();
                edge.id = new mongoose.Types.ObjectId();
                edge.from = req.body.nodeNewParentId;
                edge.to = node.id;
-               edge.save().then(edge => {
-                  res.status(200).json({'status': 'Update complete successfully. New parent created.'});
-               });
+               queue.push(edge.save());
             }
 
             if (req.body.nodeParentToRemoveId) {
-               Edge.findOne({id: req.body.nodeParentToRemoveId}, (err, edge) => {
+               // Remove the edge from the current node and to the node with id == nodeParentToRemoveId (or vise versa)
+               Edge.findOne({from: node.id, to: req.body.nodeParentToRemoveId}, (err, edge1) => {
                   if (err) {
                      res.status(400).json({'status': 'An error occurred.', error: err});
-                  } else if (!edge) {
-                     res.status(404).json({'status': `Could't find edge with id: ${req.body.nodeParentToRemoveId}`});
-                  } else {
-                     edge.remove(() => {
-                        res.status(200).json({'status': 'Update complete successfully. Parent removed.'});
+                  } else if (!edge1) {
+                     Edge.findOne({from: req.body.nodeParentToRemoveId, to: node.id}, (err, edge2) => {
+                        if (err) {
+                           res.status(400).json({'status': 'An error occurred.', error: err});
+                        } else if (!edge2) {
+                           res.status(404).json({'status': `Could't find edge: { from/to: ${req.body.nodeParentToRemoveId}, to/from: ${node.id} }`});
+                        } else {
+                           queue.push(edge2.remove());
+                        }
                      });
+                  } else {
+                     queue.push(edge1.remove());
                   }
                });
             }
 
-            res.status(200).json({'status': 'Update complete successfully.'});
+            Promise.all(queue).then(edge => {
+               console.log(edge);
+               edge = edge.length ? edge[0] : {};
+               res.status(200).json({'status': 'Update complete successfully.', edge: edge});
+            });
          }).catch(err => {
             res.status(400).json({'status': 'An error occurred.', error: err});
          });
